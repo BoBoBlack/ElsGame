@@ -1,0 +1,4 @@
+repository "Eluosi@ssl://boboblack@sh03-plasticscm.unity.cn:8787"
+  path "/"
+    smartbranch "/main/18234176929" 
+     
