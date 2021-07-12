@@ -55,11 +55,18 @@ public class elsController : MonoBehaviour
     public GameObject RayAnimObj;
 
     public Text text_ScoreAdd;
+
+    public Image Image_RankList;
+    public RectTransform Rect_rankConten;
+    public RankItem rankItemBase;
+    public Text text_myRank;
     // Start is called before the first frame update
     void Start()
     {
         Text_CurScore.text = "0";
-        Text_SaveScore.text = DataCommon.Instance.GetScoreData().ToString();
+        //Text_SaveScore.text = DataCommon.Instance.GetLocalScoreData().ToString();
+        DataCommon.Instance.netMaxScore = DataCommon.Instance.showMaxScore = DataCommon.Instance.GetMyNetScore();
+        Text_SaveScore.text = DataCommon.Instance.showMaxScore.ToString();
         CurScoreSequence = DOTween.Sequence();
         CurScoreSequence.SetAutoKill(false);
         SaveScoreSequence = DOTween.Sequence();
@@ -184,11 +191,9 @@ public class elsController : MonoBehaviour
                 int show = Mathf.FloorToInt(value);
                 Text_CurScore.text = show.ToString();
             },int.Parse(Text_CurScore.text), curScore,1f));
-            //Text_CurScore.text = curScore.ToString();
-            if (curScore> DataCommon.Instance.GetScoreData())
+            if (curScore> DataCommon.Instance.showMaxScore)
             {
-                DataCommon.Instance.SaveScoreData(curScore);
-                //Text_SaveScore.text = curScore.ToString();
+                DataCommon.Instance.showMaxScore = curScore;
                 SaveScoreSequence.Append(DOTween.To(delegate (float value) {
                     int show = Mathf.FloorToInt(value);
                     Text_SaveScore.text = show.ToString();
@@ -300,7 +305,8 @@ public class elsController : MonoBehaviour
             //GAME OVER
             IsOver = true;
             Image_Over.gameObject.SetActive(true);
-            DataCommon.Instance.SaveScoreData(curScore);
+            DataCommon.Instance.SaveMyNetScore();
+            //DataCommon.Instance.SaveLocalScoreData(curScore);
         }
 
        
@@ -490,6 +496,47 @@ public class elsController : MonoBehaviour
     {
         Application.Quit();
     }
+    private void OnApplicationQuit()
+    {
+        Application.wantsToQuit += delegate
+        {
+            if (curScore > DataCommon.Instance.showMaxScore)
+                DataCommon.Instance.SaveMyNetScore();
+            return true;
+        };
+    }
+    public void ClickRankList()
+    {
+        if (Image_RankList.gameObject.activeInHierarchy) return;
+
+        DataCommon.Instance.SaveMyNetScore();
+
+        RankItem[] rankItemAry = Rect_rankConten.GetComponentsInChildren<RankItem>();
+        Image_RankList.gameObject.SetActive(true);
+        List<UserScoreData> scoreList = DataCommon.Instance.GetRankList();
+        text_myRank.text = "我的排名：" + DataCommon.Instance.myRank.ToString();
+        //删除多余的item（不主动删除数据库的情况下，基本上不触发）
+        if (rankItemAry.Length> scoreList.Count)
+        {
+            for (int i = scoreList.Count; i < rankItemAry.Length; i++)
+            {
+                Destroy(rankItemAry[i].gameObject);
+            }
+        }
+        Rect_rankConten.sizeDelta = new Vector2(0, scoreList.Count * 110 + 10);
+        for (int i = 0; i < scoreList.Count; i++)
+        {
+            if(i< rankItemAry.Length)
+            {
+                rankItemAry[i].InitItem(scoreList[i].rank, scoreList[i].userName, scoreList[i].score);
+            }
+            else
+            {
+                RankItem item = Instantiate(rankItemBase, Rect_rankConten.transform).GetComponent<RankItem>();
+                item.InitItem(scoreList[i].rank, scoreList[i].userName, scoreList[i].score);
+            }
+        }
+    }
     /// <summary>
     /// 重新开始
     /// </summary>
@@ -531,7 +578,8 @@ public class elsController : MonoBehaviour
         }
 
         Image_Over.gameObject.SetActive(false);
-        DataCommon.Instance.SaveScoreData(curScore);
+        //DataCommon.Instance.SaveLocalScoreData(curScore);
+        DataCommon.Instance.SaveMyNetScore();
         curScore = 0;
         GroupUpdateCount = 0;
         GroupColorUpdateCount = 0;
