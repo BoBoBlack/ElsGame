@@ -1,7 +1,9 @@
+using LitJson;
 using MySql.Data.MySqlClient;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Networking;
 
 public class DataCommon : MonoBehaviour
 {
@@ -14,8 +16,10 @@ public class DataCommon : MonoBehaviour
     public int showMaxScore;
     public int netMaxScore;
     public int myRank;
-    string dataUrl = "datasource=39.106.160.158;port=3306;database=elsgamedb;user=root;pwd=Yrx246;charset=utf8";
+    
+    string wurl = "http://39.106.160.158:90/elsGame/elsscore.php";
 
+    List<UserScoreData> showRankList = new List<UserScoreData>();
     private void Start()
     {
         
@@ -48,104 +52,101 @@ public class DataCommon : MonoBehaviour
     #endregion
 
     #region 服务器数据
-    public int GetMyNetScore()
+    public void GetMyNetScore()
     {
-        Dictionary<string, string> myDic = new Dictionary<string, string>();
-        myDic.Clear();
-        MySqlConnection conn = new MySqlConnection(dataUrl);
-        //"数据库连接成功";
-        conn.Open();
-        MySqlCommand cmd = new MySqlCommand("select * from score", conn);
-        MySqlDataReader reader = cmd.ExecuteReader();
-        while (reader.Read())
+        WWWForm form = new WWWForm();
+        form.AddField("username", username);
+        form.AddField("score", 0);
+        form.AddField("action", "GetUserScore");
+
+        StartCoroutine(SendScorePost(wurl, form, "GetUserScore"));
+    }
+    IEnumerator SendScorePost(string url, WWWForm wForm,string action)
+    {
+        UnityWebRequest webRequest = UnityWebRequest.Post(url, wForm);
+        yield return webRequest.SendWebRequest();
+        if (webRequest.result == UnityWebRequest.Result.ConnectionError || webRequest.result == UnityWebRequest.Result.ProtocolError)
         {
-            string _usernames = reader.GetString("username");
-            string _score = reader.GetString("score");
-            myDic.Add(_usernames, _score);
-        }
-        if (myDic.ContainsKey(username))
-        {
-            string vale;
-            if (myDic.TryGetValue(username, out vale))
-            {
-                reader.Close();
-                conn.Close();
-                return int.Parse(vale);
-            }
-            return 0;
+            Debug.Log(webRequest.error);
         }
         else
         {
-            return 0;
+            switch(action)
+            {
+                case "GetUserScore":
+                    JsonData json = JsonMapper.ToObject(webRequest.downloadHandler.text);
+                    showMaxScore = netMaxScore = int.Parse(json[0]["score"].ToString());
+                    elsController.Instance.Text_SaveScore.text = showMaxScore.ToString();
+                    break;
+                case "SaveUserScore":
+                    netMaxScore = showMaxScore;
+                    break;
+                case "GetRankList":
+                    showRankList.Clear();
+                    JsonData jsonRank = JsonMapper.ToObject(webRequest.downloadHandler.text);
+                    myRank= int.Parse(jsonRank["myrank"].ToString());
+                    for (int i = 0; i < jsonRank["ranks"].Count; i++)
+                    {
+                        UserScoreData scoredata = new UserScoreData(i + 1, jsonRank["ranks"][i]["username"].ToString(), int.Parse(jsonRank["ranks"][i]["score"].ToString()));
+                        showRankList.Add(scoredata);
+                    }
+                    elsController.Instance.ShowRankList(showRankList);
+                    break;
+            }
         }
-       
     }
     public void SaveMyNetScore()
     {
         if (showMaxScore <= netMaxScore) return;
-        MySqlConnection conn = new MySqlConnection(dataUrl);
-        conn.Open();
-        //先要查询一下要获取的账号是否在目前数据库中。
-        MySqlCommand myCommand = new MySqlCommand("select*from score", conn);
-        MySqlDataReader reader = myCommand.ExecuteReader();
-        Dictionary<string, int> scoreDic = new Dictionary<string, int>();
-        while (reader.Read())
-        {
-            scoreDic.Add(reader.GetString("username"), reader.GetInt32("score"));
-        }
-        if (scoreDic.ContainsKey(username))
-        {
-            reader.Close();//先将查询的功能关闭
-            MySqlCommand cmd = new MySqlCommand("update score set score='" + showMaxScore + "'"+ "where username = '" + username + "'", conn);
-            cmd.ExecuteNonQuery();
-            conn.Close();
-            netMaxScore = showMaxScore;
-        }
-        else
-        {
-            reader.Close();//先将查询的功能关闭
-            MySqlCommand cmd = new MySqlCommand("insert into score set username ='" + username + "'" + ",score='" + showMaxScore + "'", conn);
-            cmd.Parameters.AddWithValue("username", username);
-            cmd.Parameters.AddWithValue("score", showMaxScore);
-            cmd.ExecuteNonQuery();
-            conn.Close();
-        }
+        WWWForm form = new WWWForm();
+        form.AddField("username", username);
+        form.AddField("score", showMaxScore);
+        form.AddField("action", "SaveUserScore");
+
+        StartCoroutine(SendScorePost(wurl, form, "SaveUserScore"));      
     }
-    public List<UserScoreData> GetRankList()
+    public void GetRankList()
     {
-        MySqlConnection conn = new MySqlConnection(dataUrl);
-        conn.Open();
-        //先要查询一下要获取的账号是否在目前数据库中。
-        MySqlCommand myCommand = new MySqlCommand("select*from score", conn);
-        MySqlDataReader reader = myCommand.ExecuteReader();
-        List<UserScoreData> scoreList = new List<UserScoreData>();
+
+        WWWForm form = new WWWForm();
+        form.AddField("username", username);
+        form.AddField("score", 0);
+        form.AddField("action", "GetRankList");
+
+        StartCoroutine(SendScorePost(wurl, form, "GetRankList"));
+
+        //MySqlConnection conn = new MySqlConnection(dataUrl);
+        //conn.Open();
+        ////先要查询一下要获取的账号是否在目前数据库中。
+        //MySqlCommand myCommand = new MySqlCommand("select*from score", conn);
+        //MySqlDataReader reader = myCommand.ExecuteReader();
+        //List<UserScoreData> scoreList = new List<UserScoreData>();
          
-        while (reader.Read())
-        {
-            UserScoreData scoreData = new UserScoreData(0, reader.GetString("username"), reader.GetInt32("score"));
-            scoreList.Add(scoreData);
-        }
-        reader.Close();
-        conn.Close();
+        //while (reader.Read())
+        //{
+        //    UserScoreData scoreData = new UserScoreData(0, reader.GetString("username"), reader.GetInt32("score"));
+        //    scoreList.Add(scoreData);
+        //}
+        //reader.Close();
+        //conn.Close();
 
-        QuickSort(scoreList, 0, scoreList.Count - 1);
+        //QuickSort(scoreList, 0, scoreList.Count - 1);
 
-        List<UserScoreData> showRankList = new List<UserScoreData>();
+        //showRankList.Clear();
 
-        for (int i = 0; i < scoreList.Count; i++)
-        {
-            scoreList[i].rank = i + 1;
-            if(scoreList[i].userName==username)
-                myRank= i + 1;
-            if(i<100)
-            {
-                showRankList.Add(scoreList[i]);
-            }
-        }
-
-        return showRankList;
+        //for (int i = 0; i < scoreList.Count; i++)
+        //{
+        //    scoreList[i].rank = i + 1;
+        //    if(scoreList[i].userName==username)
+        //        myRank= i + 1;
+        //    if(i<100)
+        //    {
+        //        showRankList.Add(scoreList[i]);
+        //    }
+        //}
     }
     #endregion
+    
     void QuickSort(List<UserScoreData> scoreList,int left,int right)
     {
         if(left<right)

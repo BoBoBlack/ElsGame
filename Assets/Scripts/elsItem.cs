@@ -18,6 +18,7 @@ public class elsItem : MonoBehaviour
     public Sprite mSprite;
     public ElsProps mProps = ElsProps.None;
     bool isSet;
+    bool isLock;
     // Start is called before the first frame update
     void Start()
     {
@@ -38,10 +39,12 @@ public class elsItem : MonoBehaviour
             mSprite = elsController.Instance.baoshi_UpdateSprite;
         }
         GetComponent<Image>().sprite = mSprite;
-        GetComponent<Image>().color = Color.white;
+        if (!isLock)
+            GetComponent<Image>().color = Color.white;
     }
     private void OnDisable()
     {
+        isLock = false;
         if (elsController.Instance.IsOver) return;
         if (isSet)
         {
@@ -119,10 +122,12 @@ public class elsItem : MonoBehaviour
     }
     public void SetLockState()
     {
+        isLock = true;
         GetComponent<Image>().color = Color.gray;
     }
     public void SetUnlockState()
     {
+        isLock = false;
         GetComponent<Image>().color = Color.white; 
     }
 }

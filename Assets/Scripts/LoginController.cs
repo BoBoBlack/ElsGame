@@ -2,6 +2,7 @@ using MySql.Data.MySqlClient;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.UI;
 
 public class LoginController : MonoBehaviour
@@ -19,9 +20,11 @@ public class LoginController : MonoBehaviour
 
     public GameObject Canvas_Main;
 
-    string dataUrl = "datasource=39.106.160.158;port=3306;database=elsgamedb;user=root;pwd=Yrx246;charset=utf8";
+    
     string username;
     string password;
+
+    string wwwurl = "http://39.106.160.158:90/elsGame/elslogin.php";
     // Start is called before the first frame update
     void Start()
     {
@@ -42,52 +45,15 @@ public class LoginController : MonoBehaviour
     {
         username = input_login_username.text;
         password = input_login_password.text;
-        if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
-        {
-            SetLoginWarn("用户名和密码不能为空！",Color.red);
-        }
-        else
-        {
-            text_login_warn.text = null;
-            Dictionary<string, string> myDic = new Dictionary<string, string>();
-            myDic.Clear();
-            MySqlConnection conn = new MySqlConnection(dataUrl);
-            //"数据库连接成功";
-            conn.Open();
-            MySqlCommand cmd = new MySqlCommand("select * from users", conn);
-            MySqlDataReader reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                string _usernames = reader.GetString("username");
-                string _password = reader.GetString("password");
-                myDic.Add(_usernames, _password);
-            }
-            if (myDic.ContainsKey(username))
-            {
-                string vale;
-                if (myDic.TryGetValue(username, out vale))
-                {
-                    if (vale == password)
-                    {
-                        conn.Close();
-                        SetLoginWarn("登录成功!", Color.green);
-                        DataCommon.Instance.SaveLocalUserInfo(username, password);
-                        Canvas_Main.gameObject.SetActive(true);
-                        gameObject.SetActive(false);
-                    }
-                    else
-                    {       
-                        SetLoginWarn("密码错误，请重新输入!", Color.red);
-                    }
-                }
-            }
-            else
-            { 
-                SetLoginWarn("账号不存在!", Color.red);
-            }
-        }
-    }
 
+        WWWForm form = new WWWForm();
+        form.AddField("username", username);
+        form.AddField("password", password);
+        form.AddField("action", "login");
+
+        StartCoroutine(SendLoginRrgistPost(wwwurl, form, "login"));
+    }
+    
     public void ClickRegister()
     {
         string rUserName = input_register_username.text;
@@ -103,32 +69,59 @@ public class LoginController : MonoBehaviour
         }
         else
         {
-            MySqlConnection conn = new MySqlConnection(dataUrl);
-            conn.Open();
-            //先要查询一下要注册的账号是否在目前数据库中。
-            MySqlCommand myCommand = new MySqlCommand("select*from users", conn);
-            MySqlDataReader reader = myCommand.ExecuteReader();
-            List<string> user = new List<string>();
-            while (reader.Read())
+            WWWForm form = new WWWForm();
+            form.AddField("username", rUserName);
+            form.AddField("password", rPassword1);
+            form.AddField("action", "regist");
+
+            StartCoroutine(SendLoginRrgistPost(wwwurl, form,"regist"));
+        }
+    }
+    IEnumerator SendLoginRrgistPost(string url, WWWForm wForm,string action)
+    {
+        UnityWebRequest webRequest = UnityWebRequest.Post(url, wForm);
+        yield return webRequest.SendWebRequest();
+        if (webRequest.result == UnityWebRequest.Result.ConnectionError || webRequest.result == UnityWebRequest.Result.ProtocolError)
+        {
+            switch(action)
             {
-                string username = reader.GetString("username");
-                string password = reader.GetString("password");
-                user.Add(username);
-            }
-            if (user.Contains(rUserName))
+                case "login":
+                    SetLoginWarn("网络连接失败!", Color.red);
+                    break;
+                case "regist":
+                    SetRegisterWarn("网络连接失败！", Color.red);
+                    break;
+            } 
+        }
+        else
+        {
+            switch(action)
             {
-                SetRegisterWarn("用户名已存在！", Color.red);
+                case "login":
+                    if (webRequest.downloadHandler.text == "success")
+                    {
+                        SetLoginWarn("登录成功!", Color.green);
+                        DataCommon.Instance.SaveLocalUserInfo(username, password);
+                        Canvas_Main.gameObject.SetActive(true);
+                        gameObject.SetActive(false);
+                    }
+                    else if (webRequest.downloadHandler.text == "error")
+                    {
+                        SetLoginWarn("用户名或密码错误，请重新输入!", Color.red);
+                    }
+                    break;
+                case "regist":
+                    if (webRequest.downloadHandler.text == "exist")
+                    {
+                        SetRegisterWarn("用户名已存在！", Color.red);
+                    }
+                    else if (webRequest.downloadHandler.text == "success")
+                    {
+                        SetRegisterWarn("注册成功，请返回登录！", Color.green);
+                    }
+                    break;
             }
-            else
-            {
-                reader.Close();//先将查询的功能关闭
-                MySqlCommand cmd = new MySqlCommand("insert into users set username ='" + rUserName + "'" + ",password='" + rPassword1 + "'", conn);
-                cmd.Parameters.AddWithValue("username", rUserName);
-                cmd.Parameters.AddWithValue("password", rPassword1);
-                cmd.ExecuteNonQuery();
-                conn.Close();
-                SetRegisterWarn("注册成功，请返回登录！", Color.green);
-            }
+            
         }
     }
     public void ClickToRegister()

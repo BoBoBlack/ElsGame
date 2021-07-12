@@ -65,8 +65,7 @@ public class elsController : MonoBehaviour
     {
         Text_CurScore.text = "0";
         //Text_SaveScore.text = DataCommon.Instance.GetLocalScoreData().ToString();
-        DataCommon.Instance.netMaxScore = DataCommon.Instance.showMaxScore = DataCommon.Instance.GetMyNetScore();
-        Text_SaveScore.text = DataCommon.Instance.showMaxScore.ToString();
+        DataCommon.Instance.GetMyNetScore();
         CurScoreSequence = DOTween.Sequence();
         CurScoreSequence.SetAutoKill(false);
         SaveScoreSequence = DOTween.Sequence();
@@ -508,15 +507,19 @@ public class elsController : MonoBehaviour
     public void ClickRankList()
     {
         if (Image_RankList.gameObject.activeInHierarchy) return;
-
         DataCommon.Instance.SaveMyNetScore();
-
+        DataCommon.Instance.GetRankList();
+        //List<UserScoreData> scoreList = DataCommon.Instance.GetRankList();
+       
+    }
+    public void ShowRankList(List<UserScoreData> scoreList)
+    {
         RankItem[] rankItemAry = Rect_rankConten.GetComponentsInChildren<RankItem>();
         Image_RankList.gameObject.SetActive(true);
-        List<UserScoreData> scoreList = DataCommon.Instance.GetRankList();
+        
         text_myRank.text = "我的排名：" + DataCommon.Instance.myRank.ToString();
         //删除多余的item（不主动删除数据库的情况下，基本上不触发）
-        if (rankItemAry.Length> scoreList.Count)
+        if (rankItemAry.Length > scoreList.Count)
         {
             for (int i = scoreList.Count; i < rankItemAry.Length; i++)
             {
@@ -526,7 +529,7 @@ public class elsController : MonoBehaviour
         Rect_rankConten.sizeDelta = new Vector2(0, scoreList.Count * 110 + 10);
         for (int i = 0; i < scoreList.Count; i++)
         {
-            if(i< rankItemAry.Length)
+            if (i < rankItemAry.Length)
             {
                 rankItemAry[i].InitItem(scoreList[i].rank, scoreList[i].userName, scoreList[i].score);
             }
